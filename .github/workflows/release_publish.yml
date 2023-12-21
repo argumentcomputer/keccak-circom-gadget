@@ -1,0 +1,79 @@
+name: Publish the release on our repository
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.pull_request.title, 'Release:')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Node
+        id: setup_node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.10.0"
+          cache: 'npm'
+      - name: Git Setup
+        run: |
+          git --version
+          git config user.name "GitHub Release Bot"
+          git config user.email "<>"
+          git remote set-url origin https://${{ secrets.TOKEN }}@github.com/${GITHUB_REPOSITORY}.git
+      - name: Install Circom Binary
+        id: install_circom
+        run: |
+          # Download the binary & make it executable
+          curl -L -o circom 'https://github.com/iden3/circom/releases/download/v2.1.7/circom-linux-amd64'
+          chmod +x circom
+          git pull
+      - name: Install dependencies
+        id: install_dep
+        run: |
+          npm ci
+      - name: Run tests
+        id: run_tests
+        run: |
+          npm run test
+      - name: Get tag
+        id: get_tag
+        run: |
+          next_version=$(grep -m 1 -oP "^## \[\K[^\]]+" CHANGELOG.md)
+          echo "version=$next_version" >> $GITHUB_ENV
+      - name: Tag the commit
+        run: |
+          git tag -a "${{ env.version }}" -m "Version ${{ env.version }}"
+          git push origin --tags
+      - name: Create Changelog diff
+        id: changelog_diff
+        run: |
+          sed -n "/^## \[${{ env.version }}\]/,/^## \[$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1))\]/{/^## \[$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1))\]/!p;}" CHANGELOG.md > RELEASE_NOTE.md
+      - name: Compile circuits
+        id: compile_circuits
+        run: |
+          echo '${{ env.CIRCUIT_NAME }}'
+          echo '${ CIRCUIT_NAME }'
+          echo '${CIRCUIT_NAME}'
+          ./circom 'circuits/${{ env.CIRCUIT_NAME }}.circom' --r1cs --wasm --prime 'vesta'
+        env:
+          GITHUB_REPOSITORY: tchataigner/to_delete
+          CIRCUIT_NAME: keccak-256
+      - name: Release
+        id: release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: RELEASE_NOTE.md
+          files: |
+            ./${{ env.CIRCUIT_NAME }}.r1cs
+            ./${{ env.CIRCUIT_NAME }}_js/${{ env.CIRCUIT_NAME }}.wasm
+          tag_name: ${{ env.version }}
+          # note you'll typically need to create a personal access token
+          # with permissions to create releases in the other repo
+          token: ${{ secrets.TOKEN }}
+    env:
+      GITHUB_REPOSITORY: lurk-lab/keccak-circom-gadget
+      CIRCUIT_NAME: keccak-circom-gadget
