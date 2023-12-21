@@ -56,13 +56,7 @@ jobs:
       - name: Compile circuits
         id: compile_circuits
         run: |
-          echo '${{ env.CIRCUIT_NAME }}'
-          echo '${ CIRCUIT_NAME }'
-          echo '${CIRCUIT_NAME}'
           circom 'circuits/${{ env.CIRCUIT_NAME }}.circom' --r1cs --wasm --prime 'vesta'
-        env:
-          GITHUB_REPOSITORY: tchataigner/to_delete
-          CIRCUIT_NAME: keccak-256
       - name: Release
         id: release
         uses: softprops/action-gh-release@v1
