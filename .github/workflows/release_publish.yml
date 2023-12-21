@@ -30,6 +30,7 @@ jobs:
           # Download the binary & make it executable
           curl -L -o circom 'https://github.com/iden3/circom/releases/download/v2.1.7/circom-linux-amd64'
           chmod +x circom
+          sudo mv ./circom /usr/bin/circom
           git pull
       - name: Install dependencies
         id: install_dep
@@ -58,7 +59,7 @@ jobs:
           echo '${{ env.CIRCUIT_NAME }}'
           echo '${ CIRCUIT_NAME }'
           echo '${CIRCUIT_NAME}'
-          ./circom 'circuits/${{ env.CIRCUIT_NAME }}.circom' --r1cs --wasm --prime 'vesta'
+          circom 'circuits/${{ env.CIRCUIT_NAME }}.circom' --r1cs --wasm --prime 'vesta'
         env:
           GITHUB_REPOSITORY: tchataigner/to_delete
           CIRCUIT_NAME: keccak-256
