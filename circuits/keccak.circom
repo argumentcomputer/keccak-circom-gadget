@@ -10,30 +10,35 @@ template Pad(nBits) {
     signal input in[nBits];
 
     var blockSize=136*8;
-    signal output out[blockSize];
-    signal out2[blockSize];
+
+    var nBlocks = nBits \ blockSize + 1;
+
+    signal output out[nBlocks * blockSize];
+    signal out2[nBlocks * blockSize];
 
     var i;
 
     for (i=0; i<nBits; i++) {
         out2[i] <== in[i];
     }
+
     var domain = 0x01;
     for (i=0; i<8; i++) {
         out2[nBits+i] <== (domain >> i) & 1;
     }
-    for (i=nBits+8; i<blockSize; i++) {
+
+    for (i=nBits+8; i<nBlocks*blockSize; i++) {
         out2[i] <== 0;
     }
-    component aux = OrArray(8);
+    component aux = XorArray(8);
     for (i=0; i<8; i++) {
-        aux.a[i] <== out2[blockSize-8+i];
+        aux.a[i] <== out2[nBlocks*blockSize-8+i];
         aux.b[i] <== (0x80 >> i) & 1;
     }
     for (i=0; i<8; i++) {
-        out[blockSize-8+i] <== aux.out[i];
+        out[nBlocks*blockSize-8+i] <== aux.out[i];
     }
-    for (i=0; i<blockSize-8; i++) {
+    for (i=0; i<nBlocks*blockSize-8; i++) {
         out[i]<==out2[i];
     }
 }
@@ -103,21 +108,34 @@ template Final(nBits) {
     var blockSize=136*8;
     var i;
 
+    var nBlocks = nBits \ blockSize + 1;
+
     // pad
     component pad = Pad(nBits);
     for (i=0; i<nBits; i++) {
         pad.in[i] <== in[i];
     }
     // absorb
-    component abs = Absorb();
-    for (i=0; i<blockSize; i++) {
-        abs.block[i] <== pad.out[i];
+    component abs[nBlocks];
+    
+    for (var j=0; j<nBlocks; j++) {
+        abs[j] = Absorb();
+        for (i=0; i<blockSize; i++) {
+            abs[j].block[i] <== pad.out[blockSize*j+i];
+        }
+        if (j == 0) {
+            for (i=0; i<25*64; i++) {
+                abs[j].s[i] <== 0;
+            }
+        } else {
+            for (i=0; i<25*64; i++) {
+                abs[j].s[i] <== abs[j-1].out[i];
+            }
+        }
     }
+
     for (i=0; i<25*64; i++) {
-        abs.s[i] <== 0;
-    }
-    for (i=0; i<25*64; i++) {
-        out[i] <== abs.out[i];
+        out[i] <== abs[nBlocks - 1].out[i];
     }
 }
 
